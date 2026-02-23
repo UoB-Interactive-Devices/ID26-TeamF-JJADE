@@ -23,6 +23,16 @@ Questionnaire: https://forms.cloud.microsoft/Pages/DesignPageV2.aspx?subpage=des
 Consent Form: https://forms.office.com/Pages/ResponsePage.aspx?id=MH_ksn3NTkql2rGM8aQVGz3Gm2ZJz09BvdxG4GCUxdxUQ1c1MjFHVEZPV0dQOU1SUExNTlpCNlpUVC4u
 
 
+## Related Works
+Auditory Seasoning Filters: Altering Food Perception via Augmented Sonic Feedback of Chewing Sounds
+https://dl.acm.org/doi/10.1145/3544548.3580755 
+
+AROMA: Mixed-Initiative AI Assistance for Non-Visual Cooking by Grounding Multimodal Information Between Reality and Videos
+https://dl.acm.org/doi/10.1145/3746059.3747650 
+
+OSCAR: Object Status and Contextual Awareness for Recipes to Support Non-Visual Cooking
+https://dl.acm.org/doi/10.1145/3706599.3720172 
+
 
 ## Team members
 Team email: jjade-id2026@bristol.ac.uk
