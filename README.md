@@ -1,6 +1,6 @@
 # ID26-TeamF-JJADE
 
-Team Mascot:
+## Team Mascot:
 
 ![WhatsApp Image 2026-02-09 at 11 43 47 AM](https://github.com/user-attachments/assets/6517f0b4-6d26-42d5-a3c8-35d021ab5ed9)
 
