@@ -1,6 +1,9 @@
 # ID26-TeamF-JJADE
 
-<img src="https://github.com/user-attachments/assets/3e95f240-a58d-4d1c-9e6b-593c0c968d9c" height="500" alt="Team photo">
+Team Mascot:
+
+![WhatsApp Image 2026-02-09 at 11 43 47 AM](https://github.com/user-attachments/assets/6517f0b4-6d26-42d5-a3c8-35d021ab5ed9)
+
 
 
 ## Context annotation:
