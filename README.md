@@ -25,6 +25,8 @@ Consent Form: https://forms.office.com/Pages/ResponsePage.aspx?id=MH_ksn3NTkql2r
 
 
 ## Team members
+Team email: jjade-id2026@bristol.ac.uk
+
 - Jamie
 - James
 - Arsalan
