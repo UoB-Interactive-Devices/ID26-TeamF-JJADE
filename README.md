@@ -38,7 +38,13 @@ Key features include:
 🍳 Recipe and pairing suggestions – Encourages discovery of new combinations
 
 🧠 Engagement-focused design – Promotes learning and confidence in cooking
- 
+
+
+
+ ## Context annotation:
+![Spice rack](context.png)
+
+
 
 ## Form links
 
@@ -60,11 +66,6 @@ https://dl.acm.org/doi/10.1145/3706599.3720172
 ## Team Mascot:
 
 ![WhatsApp Image 2026-02-09 at 11 43 47 AM](https://github.com/user-attachments/assets/6517f0b4-6d26-42d5-a3c8-35d021ab5ed9)
-
-
-
-## Context annotation:
-![Spice rack](context.png)
 
 
 ## Team members
