@@ -15,7 +15,7 @@
 
 Overleaf: https://www.overleaf.com/5291415478wrcpcqqynssc#bc740d
 
-# Shroom 🍄
+### Shroom 🍄
 
 A Smart, Accessible Seasoning Carousel
 
