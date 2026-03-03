@@ -7,13 +7,12 @@ import time
 r = sr.Recognizer()
 
 def send_command(cmd):
-    ser.write((cmd).encode())
+    ser.write((cmd + "\n").encode())
     time.sleep(1)
 
 # source changes across devices
 # linux is /dev/ttyACM0
-ser = serial.Serial("/dev/ttyACM0", 115200)
-
+ser = serial.Serial("COM6", 115200)
 
 # Use the microphone as source
 with sr.Microphone() as source:
@@ -28,6 +27,7 @@ try:
     print(f"Google thinks you said: {text}")
 
     command = text.strip()
+    print(command)
     send_command(command)
     
 except sr.UnknownValueError:
