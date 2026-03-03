@@ -1,16 +1,5 @@
 # ID26-TeamF-JJADE
 
-## Team Mascot:
-
-![WhatsApp Image 2026-02-09 at 11 43 47 AM](https://github.com/user-attachments/assets/6517f0b4-6d26-42d5-a3c8-35d021ab5ed9)
-
-
-
-## Context annotation:
-![Spice rack](context.png)
-
-
-
 ## Project description
 
 Overleaf: https://www.overleaf.com/5291415478wrcpcqqynssc#bc740d
@@ -67,6 +56,15 @@ https://dl.acm.org/doi/10.1145/3746059.3747650
 
 OSCAR: Object Status and Contextual Awareness for Recipes to Support Non-Visual Cooking
 https://dl.acm.org/doi/10.1145/3706599.3720172 
+
+## Team Mascot:
+
+![WhatsApp Image 2026-02-09 at 11 43 47 AM](https://github.com/user-attachments/assets/6517f0b4-6d26-42d5-a3c8-35d021ab5ed9)
+
+
+
+## Context annotation:
+![Spice rack](context.png)
 
 
 ## Team members
