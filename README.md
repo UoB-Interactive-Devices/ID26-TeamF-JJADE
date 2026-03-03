@@ -39,10 +39,15 @@ Shroom bridges this gap by combining audio and visual cues with an interactive p
 Key features include:
 
 🔊 Multi-sensory identification – Audio and visual feedback for accurate spice selection
+
 🌱 Custom refillable containers – Suspended on a rotating ring for intuitive access
+
 ⚖️ Gravity-based dispensing and measuring – Simple, mechanical, and precise
+
 📉 Personalized low-stock alerts – Smart notifications when spices are running low
+
 🍳 Recipe and pairing suggestions – Encourages discovery of new combinations
+
 🧠 Engagement-focused design – Promotes learning and confidence in cooking
  
 
