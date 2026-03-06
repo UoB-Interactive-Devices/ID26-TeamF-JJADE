@@ -7,7 +7,7 @@ import time
 r = sr.Recognizer()
 
 def send_command(cmd):
-    ser.write((cmd).encode())
+    ser.write((cmd + "\n").encode())
     time.sleep(1)
 
 # source changes across devices
@@ -36,6 +36,7 @@ try:
     print(f"Google thinks you said: {text}")
 
     command = text.strip()
+    print(command)
     send_command(command)
     
 except sr.UnknownValueError:
