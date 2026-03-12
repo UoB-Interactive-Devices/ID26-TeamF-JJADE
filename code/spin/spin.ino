@@ -1,24 +1,19 @@
 #include <ESP32Servo.h>
 
-Servo myservo;  // create servo object to control a servo
-Servo gearservo;
+Servo ringServo;  // create servo object to control a servo
+Servo gearServo;
 
-int pos = 0;    // variable to store the servo position
+int ringPos = 0;    // variable to store the servo position
 int gearPos = 0;
-#if defined(CONFIG_IDF_TARGET_ESP32S2) || defined(CONFIG_IDF_TARGET_ESP32S3)
-int servoPin = D9;
-#elif defined(CONFIG_IDF_TARGET_ESP32C3)
-int servoPin = D9;
-#else
-int servoPin = D9;
-#endif
-
+int ringPin = D9;
 int gearPin = D8;
 
 
-String command = "none";
-String direction = "forward";
-int step = 1;
+String ringCommand = "none";
+String gearCommand = "none";
+String ringDirection = "forward";
+String input = "none";
+int ringStep = 1;
 
 
 void setup() {
@@ -29,11 +24,11 @@ void setup() {
 	ESP32PWM::allocateTimer(1);
 	ESP32PWM::allocateTimer(2);
 	ESP32PWM::allocateTimer(3);
-	myservo.setPeriodHertz(50);    // standard 50 hz servo
-	myservo.attach(servoPin, 1000, 2000); // 
+	ringServo.setPeriodHertz(50);    // standard 50 hz servo
+	ringServo.attach(ringPin, 1000, 2000); // 
 
-  gearservo.setPeriodHertz(50);
-  gearservo.attach(gearPin, 1000, 2000);
+  gearServo.setPeriodHertz(50);
+  gearServo.attach(gearPin, 1000, 2000);
 
   Serial.println("Ready");
 }
@@ -42,69 +37,81 @@ void setup() {
 
 void loop() {
   if (Serial.available()) {
-    command = Serial.readStringUntil('\n');
-    command.trim();
+    input = Serial.readStringUntil('\n');
+    input.trim();
+
+    if (input == "push" || input == "pull") {
+      gearCommand = input;
+    } else {
+      ringCommand = input;
+    }
   }
 
   // makes big servo spin in one direction
   // command spin never turns itself off
-  if (command == "spin" && direction == "forward") {
-    if (pos < 180) {
-      pos += min(step, 180);
-      myservo.write(pos);
+  if (ringCommand == "spin" && ringDirection == "forward") {
+    if (ringPos < 180) {
+      ringPos += min(ringStep, 180);
+      ringServo.write(ringPos);
       delay(10);
     } else {
-      direction = "backward";
+      ringDirection = "backward";
     }
   }
   // handles other direction
-  if (command == "spin" && direction == "backward") {
-    if (pos > 0) {
-      pos -= max(step, 0);
-      myservo.write(pos);
+  if (ringCommand == "spin" && ringDirection == "backward") {
+    if (ringPos > 0) {
+      ringPos -= max(ringStep, 0);
+      ringServo.write(ringPos);
       delay(10);
     } else {
-      direction = "forward";
+      ringDirection = "forward";
     }
   }
 
   // initial set up for pushing gears for smaller servo
-  if (command == "push") {
+  if (gearCommand == "push") {
     // first return to centre
     if (gearPos != 0){ 
       // set gearpos to 0
-      gearservo.write(0);
+      gearPos = 0;
+      gearServo.write(0);
       delay(10);
-      command = "push_go"
     } 
+    gearCommand = "push_go";
   }
 
   // second part of rotating the servo until 180
-  if (command == "push_go") {
+  if (gearCommand == "push_go") {
     if (gearPos < 180) {
       gearPos += 1;
-      gearservo.write(gearPos);
+      gearServo.write(gearPos);
       delay(10);
-    } 
+      // command stays the same
+    } else {
+      gearCommand = "none";
+    }
   }
 
   // pull the rod in via the gears back to zero
-  if (command == "pull") {
+  if (gearCommand == "pull") {
     if (gearPos > 0){
       gearPos -= 1;
-      gearservo.write(gearPos);
+      gearServo.write(gearPos);
       delay(10);
+    } else {
+      gearCommand = "none";
     }
   }
 
   // changes the step of the big servo
-  if (command == "fast"){
-    step = 5;
-    command = "spin";
+  if (ringCommand == "fast"){
+    ringStep = 5;
+    ringCommand = "spin";
   }
-  if (command == "slow"){
-    step = 1;
-    command = "spin";
+  if (ringCommand == "slow"){
+    ringStep = 1;
+    ringCommand = "spin";
   }
   
 }

@@ -1,6 +1,4 @@
-from faster_whisper import WhisperModel
-import sounddevice as sd
-import numpy as np
+# same as whisper listen but uses typed commmand line instead
 # pip install pyserial NOT just serial
 import serial
 import time
@@ -23,31 +21,11 @@ def send_command(cmd):
     ser.write(cmd.encode())
     time.sleep(1)
 
-# load whisper model
-model = WhisperModel("base", compute_type="int8")
-
-# recording parameters
-sample_rate = 16000
-duration = 1
-
 while True:
     # record audio
-    print(">>> Listening... ")
-    audio = sd.rec(int(duration * sample_rate), samplerate=sample_rate, channels=1, dtype="float32")
-    sd.wait()
-
-    audio = np.squeeze(audio)
-
-    # transcirbe
-    segments, _ = model.transcribe(audio)
-
-    text = ""
-    for segment in segments:
-        text += segment.text
+    text = input("Enter command: ")
 
     text = text.strip()
-
-    print("Whisper thinks you said:", text)
 
     for command in commands:
         if command in text.lower():
