@@ -44,3 +44,9 @@ while True:
 
     if "stop" in text.lower():
         send_command("stop\n")
+
+    if "fast" in text.lower():
+        send_command("fast\n")
+    
+    if "slow" in text.lower():
+        send_command("slow\n")

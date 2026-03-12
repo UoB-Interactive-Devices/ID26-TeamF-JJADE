@@ -53,6 +53,12 @@ Questionnaire: https://forms.cloud.microsoft/Pages/ResponsePage.aspx?id=MH_ksn3N
 Consent Form: https://forms.office.com/Pages/ResponsePage.aspx?id=MH_ksn3NTkql2rGM8aQVGz3Gm2ZJz09BvdxG4GCUxdxUQ1c1MjFHVEZPV0dQOU1SUExNTlpCNlpUVC4u
 
 
+## Context
+
+| Storyboard | Description |
+| :--- | :--- |
+| <img width="400" height="auto" src="docs/images/20260309_124033.jpg"> | Alternative ways the spice rack might be used by users and automatic ordering.  |
+
 ## Related Works
 Auditory Seasoning Filters: Altering Food Perception via Augmented Sonic Feedback of Chewing Sounds
 https://dl.acm.org/doi/10.1145/3544548.3580755 
