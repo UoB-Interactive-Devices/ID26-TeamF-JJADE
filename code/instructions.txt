@@ -1,0 +1,4 @@
+1. Run the spin.ino code from the arduino IDE (or whatever)
+2. Make sure the serial monitor is closed.
+3. Run the whisper_listen.py code through python
+4. Speak one of the commands until it picks it up
