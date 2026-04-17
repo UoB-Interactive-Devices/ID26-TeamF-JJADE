@@ -3,11 +3,26 @@ import serial
 import sounddevice as sd
 import numpy as np
 from faster_whisper import WhisperModel
+from openai import OpenAI
+import json
 
 PORT = "/dev/ttyACM0"
 BAUD = 115200
 
-VALID_COMMANDS = {"spin", "stop", "fast", "slow", "push", "pull"}
+client = OpenAI()
+
+SPICES = ["paprika", "cumin", "pepper", "salt", "oregano", "flakes"]
+
+SPICE_MAP = {
+    "paprika": 0,
+    "cumin": 30,
+    "pepper": 60,
+    "salt": 90,
+    "oregano": 120,
+    "flakes": 150
+}
+
+VALID_COMMANDS = set(SPICE_MAP.keys())
 
 # Whisper settings
 MODEL_NAME = "base"
@@ -15,6 +30,47 @@ COMPUTE_TYPE = "int8"
 SAMPLE_RATE = 16000
 DURATION = 1.0
 
+def interpret_with_ai(user_text):
+    response = client.responses.create(
+        model="gpt-5.4-mini",
+        input=[
+            {
+                "role": "system",
+                "content": (
+                    "You control a spice carousel.\n"
+                    "Select ONE spice based on the user's request.\n"
+                    "Allowed spices: paprika, cumin, pepper, salt, oregano, flakes.\n"
+                    "Return ONLY valid JSON.\n"
+                )
+            },
+            {"role": "user", "content": user_text}
+        ],
+        text={
+            "format": {
+                "type": "json_schema",
+                "name": "spice_command",
+                "strict": True,
+                "schema": {
+                    "type": "object",
+                    "properties": {
+                        "spice": {
+                            "type": "string",
+                            "enum": SPICES
+                        }
+                    },
+                    "required": ["spice"],
+                    "additionalProperties": False
+                }
+            }
+        }
+    )
+
+    try:
+        data = json.loads(response.output_text)
+        return data
+    except:
+        print("❌ Failed to parse AI output:", response.output_text)
+        return None
 
 def connect_serial():
     try:
@@ -27,44 +83,54 @@ def connect_serial():
         return None
 
 
-def send_command(ser, cmd):
+def send_command(ser, spice):
     if ser is None:
-        print("No serial connection.")
         return
 
-    cmd = cmd.strip().lower()
-    if cmd not in VALID_COMMANDS:
-        print(f"Invalid command: {cmd}")
+    if spice not in SPICE_MAP:
+        print("Invalid spice")
         return
 
-    message = f"{cmd}\n"
+    message = f"SPICE {spice}\n"
     ser.write(message.encode("utf-8"))
     ser.flush()
     print("Command received", cmd)
 
     try:
-        response = ser.readline().decode("utf-8", errors="ignore").strip()
+        response = ser.readline().decode().strip()
         if response:
             print("Arduino:", response)
-    except Exception as e:
-        print(f"Read error: {e}")
+    except:
+        pass
 
+# For testing
+'''
+def send_command(ser, spice):
+    message = f"SPICE {spice}\n"
+
+    if ser is None:
+        print("🧪 MOCK SEND:", message.strip())
+        return
+
+    ser.write(message.encode())
+'''
 
 def parse_input(text):
     text = text.strip().lower()
 
-    if text in VALID_COMMANDS:
+    if text in SPICE_MAP:
         return text
 
-    for cmd in VALID_COMMANDS:
-        if cmd in text:
-            return cmd
+    for spice in SPICE_MAP:
+        if spice in text:
+            return spice
 
     return None
 
 
 def get_voice_command(model):
-    print(">>> Listening... ")
+    print(">>> Listening...")
+
     audio = sd.rec(
         int(DURATION * SAMPLE_RATE),
         samplerate=SAMPLE_RATE,
@@ -82,9 +148,19 @@ def get_voice_command(model):
         text += segment.text
 
     text = text.strip()
-    print("Whisper thinks you said:", text)
+    print("Heard:", text)
 
-    return parse_input(text)
+    ai_data = interpret_with_ai(text)
+
+    if ai_data and "spice" in ai_data:
+        spice = ai_data["spice"]
+
+        if spice in SPICES:
+            print(f"AI selected: {spice}")
+            return spice
+
+    print("No valid spice found")
+    return None
 
 
 def typed_mode(ser):

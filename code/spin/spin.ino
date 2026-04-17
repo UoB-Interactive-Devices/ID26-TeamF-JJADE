@@ -4,16 +4,144 @@ Servo ringServo;
 Servo gearServo;
 
 int ringPos = 0;
+int targetRingPos = 0;
+
 int gearPos = 0;
 
 int ringPin = D9;
 int gearPin = D8;
 
-String ringCommand = "none";
-String gearCommand = "none";
-String ringDirection = "forward";
 String input = "none";
-int ringStep = 1;
+String selectedSpice = "none";
+
+bool isMovingRing = false;
+bool isDispensing = false;
+bool dispenseStarted = false;
+
+unsigned long lastRingMove = 0;
+unsigned long lastGearMove = 0;
+
+const int ringStepSize = 1;       // degrees per step
+const int ringMoveInterval = 15;   // ms between ring steps
+const int gearMoveInterval = 10;   // ms between gear steps
+
+int getSpicePosition(String spice) {
+  spice.toLowerCase();
+
+  if (spice == "paprika") return 0;
+  if (spice == "cumin") return 30;
+  if (spice == "pepper") return 60;
+  if (spice == "salt") return 90;
+  if (spice == "oregano") return 120;
+  if (spice == "flakes") return 150;
+
+  return -1;
+}
+
+void startSpiceSequence(String spice) {
+  int targetPos = getSpicePosition(spice);
+
+  if (targetPos == -1) {
+    Serial.println("ERR unknown spice");
+    return;
+  }
+
+  selectedSpice = spice;
+  targetRingPos = targetPos;
+  isMovingRing = true;
+  isDispensing = false;
+  dispenseStarted = false;
+
+  Serial.print("OK ");
+  Serial.println(spice);
+}
+
+void handleCommand(String input) {
+  input.trim();
+  input.toLowerCase();
+
+  if (input.startsWith("SPICE ")) {
+    String spice = input.substring(6);
+    spice.trim();
+    startSpiceSequence(spice);
+  } else if (input == "reset") {
+    ringPos = 0;
+    targetRingPos = 0;
+    gearPos = 0;
+    ringServo.write(ringPos);
+    gearServo.write(gearPos);
+    isMovingRing = false;
+    isDispensing = false;
+    dispenseStarted = false;
+    Serial.println("OK reset");
+  } else {
+    Serial.println("ERR unknown command");
+  }
+}
+
+void readSerial() {
+  if (Serial.available()) {
+    input = Serial.readStringUntil('\n');
+    handleCommand(input);
+  }
+}
+
+void updateRing() {
+  if (!isMovingRing) return;
+
+  if (millis() - lastRingMove < ringMoveInterval) return;
+  lastRingMove = millis();
+
+  if (ringPos < targetRingPos) {
+    ringPos += ringStepSize;
+    if (ringPos > targetRingPos) ringPos = targetRingPos;
+    ringServo.write(ringPos);
+  } else if (ringPos > targetRingPos) {
+    ringPos -= ringStepSize;
+    if (ringPos < targetRingPos) ringPos = targetRingPos;
+    ringServo.write(ringPos);
+  } else {
+    isMovingRing = false;
+    isDispensing = true;
+    dispenseStarted = false;
+  }
+}
+
+void updateGear() {
+  if (!isDispensing) return;
+
+  if (millis() - lastGearMove < gearMoveInterval) return;
+  lastGearMove = millis();
+
+  // First, make sure the gear servo is at 0 before pushing
+  if (!dispenseStarted) {
+    if (gearPos > 0) {
+      gearPos -= 1;
+      if (gearPos < 0) gearPos = 0;
+      gearServo.write(gearPos);
+    } else {
+      dispenseStarted = true;
+    }
+    return;
+  }
+
+  // Push out to dispense
+  if (gearPos < 180) {
+    gearPos += 1;
+    if (gearPos > 180) gearPos = 180;
+    gearServo.write(gearPos);
+  } else {
+    // Pull back after dispensing
+    gearPos -= 1;
+    if (gearPos < 0) gearPos = 0;
+    gearServo.write(gearPos);
+
+    if (gearPos == 0) {
+      isDispensing = false;
+      Serial.println("DONE");
+    }
+  }
+}
 
 void setup() {
   Serial.begin(115200);
@@ -29,115 +157,10 @@ void setup() {
   gearServo.setPeriodHertz(50);
   gearServo.attach(gearPin, 500, 2500);
 
+  ringServo.write(ringPos);
+  gearServo.write(gearPos);
+
   Serial.println("Ready");
-}
-
-void handleCommand(String cmd) {
-  cmd.trim();
-  cmd.toLowerCase();
-
-  if (cmd == "push" || cmd == "pull") {
-    gearCommand = cmd;
-    Serial.print("OK ");
-    Serial.println(cmd);
-    return;
-  }
-
-  if (cmd == "spin") {
-    ringCommand = "spin";
-    Serial.println("OK spin");
-    return;
-  }
-
-  if (cmd == "stop") {
-    ringCommand = "stop";
-    Serial.println("OK stop");
-    return;
-  }
-
-  if (cmd == "fast") {
-    ringStep = 5;
-    ringCommand = "spin";
-    Serial.println("OK fast");
-    return;
-  }
-
-  if (cmd == "slow") {
-    ringStep = 1;
-    ringCommand = "spin";
-    Serial.println("OK slow");
-    return;
-  }
-
-  Serial.print("ERR unknown command: ");
-  Serial.println(cmd);
-}
-
-void readSerial() {
-  if (Serial.available()) {
-    input = Serial.readStringUntil('\n');
-    handleCommand(input);
-  }
-}
-
-void updateRing() {
-  if (ringCommand != "spin") {
-    return;
-  }
-
-  if (ringDirection == "forward") {
-    if (ringPos < 180) {
-      ringPos += ringStep;
-      if (ringPos > 180) ringPos = 180;
-      ringServo.write(ringPos);
-      delay(10);
-    } else {
-      ringDirection = "backward";
-    }
-  } else if (ringDirection == "backward") {
-    if (ringPos > 0) {
-      ringPos -= ringStep;
-      if (ringPos < 0) ringPos = 0;
-      ringServo.write(ringPos);
-      delay(10);
-    } else {
-      ringDirection = "forward";
-    }
-  }
-}
-
-void updateGear() {
-  if (gearCommand == "push") {
-    if (gearPos != 0) {
-      gearPos = 0;
-      gearServo.write(gearPos);
-      delay(10);
-      return;
-    }
-    gearCommand = "push_go";
-  }
-
-  if (gearCommand == "push_go") {
-    if (gearPos < 180) {
-      gearPos += 1;
-      if (gearPos > 180) gearPos = 180;
-      gearServo.write(gearPos);
-      delay(10);
-    } else {
-      gearCommand = "none";
-    }
-  }
-
-  if (gearCommand == "pull") {
-    if (gearPos > 0) {
-      gearPos -= 1;
-      if (gearPos < 0) gearPos = 0;
-      gearServo.write(gearPos);
-      delay(10);
-    } else {
-      gearCommand = "none";
-    }
-  }
 }
 
 void loop() {
