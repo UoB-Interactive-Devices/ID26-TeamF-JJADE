@@ -24,10 +24,10 @@ void setup() {
   ESP32PWM::allocateTimer(3);
 
   ringServo.setPeriodHertz(50);
-  ringServo.attach(ringPin, 1000, 2000);
+  ringServo.attach(ringPin, 500, 2500);
 
   gearServo.setPeriodHertz(50);
-  gearServo.attach(gearPin, 1000, 2000);
+  gearServo.attach(gearPin, 500, 2500);
 
   Serial.println("Ready");
 }

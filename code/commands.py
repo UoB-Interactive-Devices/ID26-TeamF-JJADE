@@ -37,9 +37,10 @@ def send_command(ser, cmd):
         print(f"Invalid command: {cmd}")
         return
 
-    message = f"CMD {cmd}\n"
+    message = f"{cmd}\n"
     ser.write(message.encode("utf-8"))
     ser.flush()
+    print("Command received", cmd)
 
     try:
         response = ser.readline().decode("utf-8", errors="ignore").strip()
