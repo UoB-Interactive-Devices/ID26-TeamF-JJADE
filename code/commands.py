@@ -5,13 +5,18 @@ import numpy as np
 from faster_whisper import WhisperModel
 from openai import OpenAI
 import json
+import os
 
 PORT = "/dev/ttyACM0"
 BAUD = 115200
 
+# import API key
+with open(os.path.expanduser("~/.openai/IDkey.txt")) as f:
+    os.environ["OPENAI_API_KEY"] = f.read().strip()
+
 client = OpenAI()
 
-SPICES = ["paprika", "cumin", "pepper", "salt", "oregano", "flakes"]
+SPICES = ["none", "paprika", "cumin", "pepper", "salt", "oregano", "flakes"]
 
 SPICE_MAP = {
     "paprika": 0,
@@ -32,14 +37,15 @@ DURATION = 1.0
 
 def interpret_with_ai(user_text):
     response = client.responses.create(
-        model="gpt-5.4-mini",
+        model="gpt-5.4",
         input=[
             {
                 "role": "system",
                 "content": (
                     "You control a spice carousel.\n"
                     "Select ONE spice based on the user's request.\n"
-                    "Allowed spices: paprika, cumin, pepper, salt, oregano, flakes.\n"
+                    "If the user request is unrelated to spices, return nothing."
+                    "Allowed spices: NONE, paprika, cumin, pepper, salt, oregano, flakes.\n"
                     "Return ONLY valid JSON.\n"
                 )
             },
@@ -94,7 +100,7 @@ def send_command(ser, spice):
     message = f"SPICE {spice}\n"
     ser.write(message.encode("utf-8"))
     ser.flush()
-    print("Command received", cmd)
+    print("Command received", message)
 
     try:
         response = ser.readline().decode().strip()
@@ -149,6 +155,8 @@ def get_voice_command(model):
 
     text = text.strip()
     print("Heard:", text)
+    if not text:
+        return None
 
     ai_data = interpret_with_ai(text)
 
