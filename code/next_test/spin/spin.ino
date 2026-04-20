@@ -33,7 +33,7 @@ int getSpicePosition(String spice) {
   if (spice == "pepper") return 60;
   if (spice == "salt") return 90;
   if (spice == "oregano") return 120;
-  if (spice == "flakes") return 150;
+  if (spice ==  "flakes") return 150;
 
   return -1;
 }

@@ -60,7 +60,7 @@ void handleCommand(String input) {
   input.trim();
   input.toLowerCase();
 
-  if (input.startsWith("SPICE ")) {
+  if (input.startsWith("spice ")) {
     String spice = input.substring(6);
     spice.trim();
     startSpiceSequence(spice);

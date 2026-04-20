@@ -69,7 +69,7 @@ def interpret_with_ai(user_text):
         data = json.loads(response.output_text)
         return data
     except:
-        print("❌ Failed to parse AI output:", response.output_text)
+        print("Failed to parse AI output:", response.output_text)
         return None
 
 def connect_serial():

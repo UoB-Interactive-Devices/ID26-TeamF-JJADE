@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Shroom</title>
+
+  <style>
+    body {
+      margin: 0;
+      font-family: Arial;
+      background: #020617;
+      color: white;
+    }
+
+    .container {
+      display: flex;
+      height: 100vh;
+    }
+
+    /* LEFT SIDE (CHAT) */
+    .left {
+      flex: 2;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .chat {
+      flex: 1;
+      overflow-y: auto;
+      margin-bottom: 20px;
+    }
+
+    .msg {
+      margin: 10px 0;
+      padding: 12px;
+      border-radius: 15px;
+      max-width: 70%;
+    }
+
+    .user {
+      background: #1e293b;
+      align-self: flex-end;
+    }
+
+    .assistant {
+      background: #0ea5e9;
+      align-self: flex-start;
+    }
+
+    textarea {
+      width: 100%;
+      padding: 12px;
+      border-radius: 10px;
+      border: none;
+      font-size: 16px;
+    }
+
+    button {
+      margin-top: 10px;
+      padding: 12px;
+      font-size: 16px;
+      border-radius: 10px;
+      border: none;
+      background: cyan;
+      color: black;
+    }
+
+    /* RIGHT SIDE (SPICES) */
+    .right {
+      flex: 1;
+      padding: 20px;
+      border-left: 1px solid #1e293b;
+    }
+
+    .spice {
+      padding: 15px;
+      margin: 10px 0;
+      border-radius: 10px;
+      background: #1e293b;
+      cursor: pointer;
+    }
+
+    .spice.active {
+      background: #0ea5e9;
+    }
+
+    .pending {
+      margin-top: 20px;
+      background: orange;
+      padding: 10px;
+      border-radius: 10px;
+    }
+  </style>
+</head>
+
+<body>
+
+<div class="container">
+
+  <!-- LEFT SIDE -->
+  <div class="left">
+    <h2>🍄 Shroom Assistant</h2>
+
+    <div id="chat" class="chat"></div>
+
+    <textarea id="input" placeholder="What are you cooking?"></textarea>
+    <button onclick="send()">Send</button>
+
+    <div id="pending"></div>
+  </div>
+
+  <!-- RIGHT SIDE -->
+  <div class="right">
+    <h2>Spices</h2>
+
+    <div class="spice" onclick="selectSpice('paprika')">Paprika</div>
+    <div class="spice" onclick="selectSpice('cumin')">Cumin</div>
+    <div class="spice" onclick="selectSpice('pepper')">Pepper</div>
+    <div class="spice" onclick="selectSpice('salt')">Salt</div>
+    <div class="spice" onclick="selectSpice('oregano')">Oregano</div>
+    <div class="spice" onclick="selectSpice('flakes')">Flakes</div>
+  </div>
+
+</div>
+
+<script>
+
+let selected = null;
+
+function addMessage(text, role) {
+  const div = document.createElement("div");
+  div.className = "msg " + role;
+  div.innerText = text;
+  document.getElementById("chat").appendChild(div);
+}
+
+async function send() {
+  const text = document.getElementById("input").value;
+
+  addMessage(text, "user");
+
+  const res = await fetch("/process", {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({ text })
+  });
+
+  const data = await res.json();
+
+  addMessage("I suggest: " + data.spice, "assistant");
+
+  createCard(data.spice);
+}
+
+function createCard(spice) {
+  const div = document.createElement("div");
+  div.className = "msg assistant";
+  div.innerHTML = `
+    Suggested: ${spice}
+    <br><br>
+    <button onclick="dispense('${spice}')">Use this</button>
+  `;
+  document.getElementById("chat").appendChild(div);
+}
+
+function selectSpice(spice) {
+  selected = spice;
+  dispense(spice);
+}
+
+function dispense(spice) {
+  document.getElementById("pending").innerHTML = `
+    Dispensing ${spice}...
+    <br>
+    <button onclick="cancel()">Cancel</button>
+  `;
+
+  setTimeout(() => {
+    document.getElementById("pending").innerHTML = "Done!";
+  }, 3000);
+}
+
+function cancel() {
+  document.getElementById("pending").innerHTML = "Cancelled";
+}
+
+</script>
+
+</body>
+</html>
