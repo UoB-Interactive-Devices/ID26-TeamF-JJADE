@@ -29,7 +29,7 @@ function cn(...classes) {
 function AssistantBubble({ role, children }) {
   const isUser = role === "user";
   return (
-    <div className={cn("flex", isUser ? "justify-end" : "justify-start") }>
+    <div className={cn("flex", isUser ? "justify-end" : "justify-start")}>
       <div
         className={cn(
           "max-w-[76%] rounded-[1.5rem] border px-4 py-3 text-sm leading-relaxed shadow-lg backdrop-blur-md",
@@ -80,8 +80,96 @@ function QuickChip({ spice, onClick }) {
       onClick={() => onClick(spice)}
       className="rounded-full border border-cyan-300/18 bg-cyan-300/10 px-3 py-1.5 text-xs font-medium capitalize text-cyan-100 transition hover:bg-cyan-300/16"
     >
-      Dispense {spice}
+      Use {spice}
     </button>
+  );
+}
+
+function getStepDescription(i, total) {
+  if (i === 0) return "Builds the base flavor";
+  if (i === total - 1) return "Finishes and balances the dish";
+  return "Adds depth and complexity";
+}
+
+function getStepLabel(i, total) {
+  if (i === 0) return "Base";
+  if (i === total - 1) return "Finish";
+  return "Layer";
+}
+
+function RecipeCard({ recipe, selectedSpice, onDispenseAll, onReplaceStep, onRemoveStep }) {
+  return (
+    <div className="rounded-[2rem] border border-white/10 bg-black/25 p-4 shadow-lg">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <div className="text-lg font-semibold text-white">{recipe.title}</div>
+          <div className="mt-1 text-sm text-slate-300">{recipe.summary}</div>
+          <div className="mt-2 text-xs uppercase tracking-[0.22em] text-slate-500">
+            Servings: {recipe.servings ?? "?"}
+          </div>
+        </div>
+
+        <button
+          type="button"
+          onClick={onDispenseAll}
+          className="inline-flex items-center gap-2 rounded-full bg-white px-4 py-2 text-sm font-semibold text-slate-950 transition hover:bg-cyan-100"
+        >
+          <CirclePlay className="h-4 w-4" />
+          Dispense recipe
+        </button>
+      </div>
+
+      <div className="mt-4 space-y-2">
+        {recipe.steps.map((step, idx) => (
+          <div
+            key={`${step.spice}-${idx}`}
+            className="flex items-center justify-between gap-3 rounded-[1.25rem] border border-white/10 bg-white/5 px-4 py-3"
+          >
+            <div>
+              <div className="text-sm font-medium text-white">
+                <span className="capitalize font-semibold">
+                  {getStepLabel(idx, recipe.steps.length)} — {step.spice}
+                </span>
+              </div>
+              <div className="mt-1 text-xs text-slate-400">
+                {step.description || getStepDescription(idx, recipe.steps.length)}
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <select
+                value={step.spice}
+                onChange={(e) => onReplaceStep(idx, e.target.value)}
+                className="rounded-full border border-cyan-300/18 bg-cyan-300/10 px-3 py-1.5 text-xs text-cyan-100"
+              >
+                {SPICES.map((s) => (
+                  <option key={s.name} value={s.name}>
+                    {s.name}
+                  </option>
+                ))}
+              </select>
+              <button
+                type="button"
+                onClick={() => onRemoveStep(idx)}
+                className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-xs text-slate-300 transition hover:bg-white/10"
+              >
+                Remove
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {recipe.notes?.length ? (
+        <div className="mt-4 rounded-[1.25rem] border border-cyan-300/12 bg-cyan-300/8 p-3">
+          <div className="text-xs uppercase tracking-[0.22em] text-cyan-200">Notes</div>
+          <ul className="mt-2 space-y-1 text-sm text-slate-300">
+            {recipe.notes.map((note, idx) => (
+              <li key={idx}>• {note}</li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+    </div>
   );
 }
 
@@ -89,15 +177,15 @@ export default function App() {
   const [messages, setMessages] = useState([
     {
       role: "assistant",
-      content: "Tell Shroom what you are cooking.",
+      content: "Tell Shroom what you want to make, and I’ll build a recipe card you can revise.",
     },
   ]);
   const [input, setInput] = useState("");
   const [selectedSpice, setSelectedSpice] = useState("cumin");
-  const [cards, setCards] = useState([]);
-  const [pendingSpice, setPendingSpice] = useState(null);
+  const [recipe, setRecipe] = useState(null);
+  const [pendingAction, setPendingAction] = useState(null); // { kind: 'spice' | 'recipe', label: string }
   const [statusText, setStatusText] = useState("ready");
-  const timerRef = useRef(null);
+  const actionTimerRef = useRef(null);
 
   const selectedSpiceObj = useMemo(
     () => SPICES.find((s) => s.name === selectedSpice) ?? SPICES[0],
@@ -106,7 +194,7 @@ export default function App() {
 
   useEffect(() => {
     return () => {
-      if (timerRef.current) clearTimeout(timerRef.current);
+      if (actionTimerRef.current) clearTimeout(actionTimerRef.current);
     };
   }, []);
 
@@ -120,42 +208,45 @@ export default function App() {
     setStatusText("thinking");
 
     try {
-      const res = await fetch("http://localhost:5000/api/suggest", {
+      const res = await fetch("/api/recipe", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text }),
+        body: JSON.stringify({ text, current_recipe: recipe }),
       });
 
       const data = await res.json();
-
       if (!res.ok) {
         throw new Error(data?.error || "Request failed");
       }
 
       setMessages((prev) => [...prev, { role: "assistant", content: data.assistant_message }]);
-      setCards(data.cards || []);
-      setStatusText("suggestion ready");
+      setRecipe(data.recipe || null);
+      setStatusText("recipe ready");
     } catch (error) {
       setMessages((prev) => [
         ...prev,
-        { role: "assistant", content: "I could not generate a suggestion right now." },
+        { role: "assistant", content: "I could not generate a recipe right now." },
       ]);
-      setCards([]);
       setStatusText("error");
     }
   }
 
-  function beginDispense(spice) {
-    if (timerRef.current) clearTimeout(timerRef.current);
+  function clearPending() {
+    if (actionTimerRef.current) clearTimeout(actionTimerRef.current);
+    actionTimerRef.current = null;
+    setPendingAction(null);
+  }
 
+  async function manualDispense(spice) {
+    clearPending();
     setSelectedSpice(spice);
-    setPendingSpice(spice);
+    setPendingAction({ kind: "spice", label: spice });
     setStatusText(`dispensing ${spice}`);
     setMessages((prev) => [...prev, { role: "assistant", content: `Dispensing ${spice}...` }]);
 
-    timerRef.current = setTimeout(async () => {
+    actionTimerRef.current = setTimeout(async () => {
       try {
-        const res = await fetch("http://localhost:5000/api/dispense", {
+        const res = await fetch("/api/dispense", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ spice }),
@@ -175,18 +266,104 @@ export default function App() {
         ]);
         setStatusText("error");
       } finally {
-        setPendingSpice(null);
-        timerRef.current = null;
+        clearPending();
       }
     }, 3000);
   }
 
-  function cancelDispense() {
-    if (timerRef.current) clearTimeout(timerRef.current);
-    timerRef.current = null;
-    setPendingSpice(null);
+  async function dispenseRecipe(card = recipe) {
+    if (!card?.steps?.length) return;
+
+    clearPending();
+    setPendingAction({ kind: "recipe", label: card.title });
+    setStatusText(`dispensing ${card.title}`);
+    setMessages((prev) => [
+      ...prev,
+      { role: "assistant", content: `Dispensing recipe: ${card.title}...` },
+    ]);
+
+    try {
+      const res = await fetch("/api/recipe/dispense", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ recipe: card }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data?.error || "Recipe dispense failed");
+      }
+
+      const approximateMs = Math.max(3000, card.steps.length * 3000);
+      actionTimerRef.current = setTimeout(() => {
+        setMessages((prev) => [
+          ...prev,
+          { role: "assistant", content: `Recipe queued: ${card.steps.length} spice steps.` },
+        ]);
+        setStatusText("recipe sent");
+        clearPending();
+      }, approximateMs);
+    } catch (error) {
+      setMessages((prev) => [
+        ...prev,
+        { role: "assistant", content: "Failed to queue the recipe." },
+      ]);
+      setStatusText("error");
+      clearPending();
+    }
+  }
+
+  async function cancelPending() {
+    if (pendingAction?.kind === "recipe") {
+      try {
+        await fetch("/api/recipe/cancel", { method: "POST" });
+      } catch {
+        // ignore cancel errors in demo mode
+      }
+    }
+
+    clearPending();
     setStatusText("canceled");
     setMessages((prev) => [...prev, { role: "assistant", content: "Action canceled." }]);
+  }
+
+  function replaceRecipeStep(index, newSpice) {
+    if (!recipe) return;
+
+    const updated = {
+      ...recipe,
+      steps: recipe.steps.map((step, idx) =>
+        idx === index ? { ...step, spice: newSpice } : step
+      ),
+    };
+
+    setRecipe(updated);
+
+    setMessages((prev) => [
+      ...prev,
+      {
+        role: "assistant",
+        content: `Updated step ${index + 1} to ${newSpice}.`,
+      },
+    ]);
+  }
+
+  function removeRecipeStep(index) {
+    if (!recipe) return;
+
+    const updated = {
+      ...recipe,
+      steps: recipe.steps.filter((_, idx) => idx !== index),
+    };
+
+    setRecipe(updated);
+    setMessages((prev) => [
+      ...prev,
+      {
+        role: "assistant",
+        content: `Removed step ${index + 1}.`,
+      },
+    ]);
   }
 
   return (
@@ -211,13 +388,12 @@ export default function App() {
         </header>
 
         <div className="grid flex-1 gap-4 lg:grid-cols-[1.2fr_0.9fr]">
-          {/* LEFT PANEL */}
           <section className="flex min-h-0 flex-col overflow-hidden rounded-[2.5rem] border border-white/10 bg-white/5 shadow-2xl backdrop-blur-xl">
             <div className="border-b border-white/8 px-6 py-4">
               <div className="flex items-center justify-between">
                 <div>
                   <h2 className="text-lg font-semibold tracking-tight">Assistant</h2>
-                  <p className="mt-1 text-sm text-slate-400">Back-and-forth cooking guidance</p>
+                  <p className="mt-1 text-sm text-slate-400">Back-and-forth recipe building</p>
                 </div>
                 <div className="rounded-full border border-cyan-300/20 bg-cyan-300/10 px-3 py-1 text-xs uppercase tracking-[0.2em] text-cyan-200">
                   Live chat
@@ -232,41 +408,26 @@ export default function App() {
                 </AssistantBubble>
               ))}
 
-              {cards.length > 0 && (
-                <div className="space-y-3 pt-1">
-                  {cards.map((card, idx) => (
-                    <div
-                      key={idx}
-                      className="rounded-[2rem] border border-white/10 bg-black/25 p-4 shadow-lg"
-                    >
-                      <div className="text-sm font-semibold text-white">{card.title}</div>
-                      <div className="mt-1 text-sm text-slate-300">{card.summary}</div>
-
-                      <div className="mt-4 flex flex-wrap gap-2">
-                        {card.spices.map((spice) => (
-                          <button
-                            key={spice}
-                            onClick={() => beginDispense(spice)}
-                            type="button"
-                            className="rounded-full border border-cyan-300/18 bg-cyan-300/10 px-3 py-1.5 text-xs font-medium capitalize text-cyan-100 transition hover:bg-cyan-300/16"
-                          >
-                            Use {spice}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  ))}
-                </div>
+              {recipe && (
+                <RecipeCard
+                  recipe={recipe}
+                  selectedSpice={selectedSpice}
+                  onDispenseAll={() => dispenseRecipe(recipe)}
+                  onReplaceStep={replaceRecipeStep}
+                  onRemoveStep={removeRecipeStep}
+                />
               )}
             </div>
 
-            {pendingSpice && (
+            {pendingAction && (
               <div className="border-t border-white/8 px-6 py-4">
                 <div className="rounded-[2rem] border border-amber-300/20 bg-amber-300/10 p-4">
                   <div className="text-xs uppercase tracking-[0.22em] text-amber-200">Action pending</div>
-                  <div className="mt-2 text-lg font-semibold text-white">Dispensing {pendingSpice}</div>
+                  <div className="mt-2 text-lg font-semibold text-white">
+                    {pendingAction.kind === "recipe" ? `Dispensing recipe: ${pendingAction.label}` : `Dispensing ${pendingAction.label}`}
+                  </div>
                   <button
-                    onClick={cancelDispense}
+                    onClick={cancelPending}
                     type="button"
                     className="mt-4 inline-flex items-center gap-2 rounded-2xl border border-white/15 bg-white/5 px-4 py-3 text-sm font-medium text-white transition hover:bg-white/10"
                   >
@@ -288,8 +449,8 @@ export default function App() {
                     onChange={(e) => setInput(e.target.value)}
                     onKeyDown={(e) => {
                       if (e.key === "Enter" && !e.shiftKey) {
-                        e.preventDefault();   // stop new line
-                        handleSend(e);        // trigger submit
+                        e.preventDefault();
+                        handleSend(e);
                       }
                     }}
                     rows={2}
@@ -309,13 +470,12 @@ export default function App() {
             </form>
           </section>
 
-          {/* RIGHT PANEL */}
           <aside className="flex min-h-0 flex-col overflow-hidden rounded-[2.5rem] border border-white/10 bg-white/5 shadow-2xl backdrop-blur-xl">
             <div className="border-b border-white/8 px-6 py-4">
               <div className="flex items-center justify-between">
                 <div>
                   <h2 className="text-lg font-semibold tracking-tight">Dispense spice</h2>
-                  <p className="mt-1 text-sm text-slate-400">Choose a spice or use an AI suggestion</p>
+                  <p className="mt-1 text-sm text-slate-400">Choose a spice or use a recipe step</p>
                 </div>
                 <div className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs uppercase tracking-[0.2em] text-slate-300">
                   {selectedSpice}
@@ -342,7 +502,7 @@ export default function App() {
 
                 <button
                   type="button"
-                  onClick={() => beginDispense(selectedSpiceObj.name)}
+                  onClick={() => manualDispense(selectedSpiceObj.name)}
                   className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-[1.35rem] bg-white px-4 py-3 text-sm font-semibold text-slate-950 transition hover:bg-cyan-100"
                 >
                   <CirclePlay className="h-4 w-4" />
@@ -351,14 +511,14 @@ export default function App() {
               </div>
 
               <div className="mt-4 rounded-[2rem] border border-white/10 bg-gradient-to-br from-cyan-400/10 to-fuchsia-400/10 p-4">
-                <div className="text-sm font-semibold text-white">Quick dispense</div>
+                <div className="text-sm font-semibold text-white">Recipe steps</div>
                 <div className="mt-3 flex flex-wrap gap-2">
-                  {cards.length > 0 ? (
-                    cards.flatMap((card) => card.spices).map((spice, idx) => (
-                      <QuickChip key={`${spice}-${idx}`} spice={spice} onClick={beginDispense} />
+                  {recipe ? (
+                    recipe.steps.map((step, idx) => (
+                      <QuickChip key={`${step.spice}-${idx}`} spice={step.spice} onClick={manualDispense} />
                     ))
                   ) : (
-                    <div className="text-sm text-slate-400">Suggestion buttons will appear here.</div>
+                    <div className="text-sm text-slate-400">Recipe steps will appear here.</div>
                   )}
                 </div>
               </div>
