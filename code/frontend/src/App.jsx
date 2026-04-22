@@ -186,11 +186,21 @@ export default function App() {
   const [pendingAction, setPendingAction] = useState(null); // { kind: 'spice' | 'recipe', label: string }
   const [statusText, setStatusText] = useState("ready");
   const actionTimerRef = useRef(null);
+  const chatRef = useRef(null);
 
   const selectedSpiceObj = useMemo(
     () => SPICES.find((s) => s.name === selectedSpice) ?? SPICES[0],
     [selectedSpice]
   );
+
+  useEffect(() => {
+    if (!chatRef.current) return;
+
+    chatRef.current.scrollTo({
+      top: chatRef.current.scrollHeight,
+      behavior: "smooth",
+    });
+  }, [messages, recipe]);
 
   useEffect(() => {
     return () => {
@@ -367,8 +377,8 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(34,211,238,0.18),_transparent_24%),radial-gradient(circle_at_bottom_right,_rgba(168,85,247,0.16),_transparent_20%),linear-gradient(180deg,_#000_0%,_#050816_36%,_#020617_100%)] text-white">
-      <div className="mx-auto flex min-h-screen max-w-7xl flex-col gap-4 p-4 sm:p-6 lg:p-8">
+    <div className="h-dvh overflow-hidden bg-[radial-gradient(circle_at_top,_rgba(34,211,238,0.18),_transparent_24%),radial-gradient(circle_at_bottom_right,_rgba(168,85,247,0.16),_transparent_20%),linear-gradient(180deg,_#000_0%,_#050816_36%,_#020617_100%)] text-white">
+      <div className="mx-auto flex h-full max-w-7xl flex-col gap-4 p-4 sm:p-6 lg:p-8">
         <header className="rounded-[2.25rem] border border-white/10 bg-white/5 px-5 py-4 shadow-2xl backdrop-blur-xl">
           <div className="flex items-center justify-between gap-4">
             <div className="flex items-center gap-4">
@@ -387,8 +397,8 @@ export default function App() {
           </div>
         </header>
 
-        <div className="grid flex-1 gap-4 lg:grid-cols-[1.2fr_0.9fr]">
-          <section className="flex min-h-0 flex-col overflow-hidden rounded-[2.5rem] border border-white/10 bg-white/5 shadow-2xl backdrop-blur-xl">
+        <div className="grid flex-1 min-h-0 gap-4 lg:grid-cols-[1.2fr_0.9fr]">
+          <section className="flex h-full min-h-0 flex-col overflow-hidden rounded-[2.5rem] border border-white/10 bg-white/5 shadow-2xl backdrop-blur-xl">
             <div className="border-b border-white/8 px-6 py-4">
               <div className="flex items-center justify-between">
                 <div>
@@ -401,22 +411,24 @@ export default function App() {
               </div>
             </div>
 
-            <div className="flex-1 space-y-4 overflow-y-auto px-6 py-5">
-              {messages.map((m, idx) => (
-                <AssistantBubble key={idx} role={m.role}>
-                  {m.content}
-                </AssistantBubble>
-              ))}
+            <div ref={chatRef} className="flex-1 min-h-0 overflow-y-auto px-6 py-5">
+              <div className="flex flex-col gap-4">
+                {messages.map((m, idx) => (
+                  <AssistantBubble key={idx} role={m.role}>
+                    {m.content}
+                  </AssistantBubble>
+                ))}
 
-              {recipe && (
-                <RecipeCard
-                  recipe={recipe}
-                  selectedSpice={selectedSpice}
-                  onDispenseAll={() => dispenseRecipe(recipe)}
-                  onReplaceStep={replaceRecipeStep}
-                  onRemoveStep={removeRecipeStep}
-                />
-              )}
+                {recipe && (
+                  <RecipeCard
+                    recipe={recipe}
+                    selectedSpice={selectedSpice}
+                    onDispenseAll={() => dispenseRecipe(recipe)}
+                    onReplaceStep={replaceRecipeStep}
+                    onRemoveStep={removeRecipeStep}
+                  />
+                )}
+              </div>
             </div>
 
             {pendingAction && (
@@ -438,7 +450,7 @@ export default function App() {
               </div>
             )}
 
-            <form onSubmit={handleSend} className="border-t border-white/8 px-6 py-5">
+            <form onSubmit={handleSend} className="shrink-0 border-t border-white/8 px-6 py-5">
               <div className="flex items-end gap-3 rounded-[2rem] border border-white/10 bg-black/20 px-5 py-4">
                 <div className="flex-1">
                   <label className="mb-2 block text-[11px] uppercase tracking-[0.25em] text-slate-400">
@@ -470,7 +482,7 @@ export default function App() {
             </form>
           </section>
 
-          <aside className="flex min-h-0 flex-col overflow-hidden rounded-[2.5rem] border border-white/10 bg-white/5 shadow-2xl backdrop-blur-xl">
+          <aside className="flex h-full min-h-0 flex-col overflow-hidden rounded-[2.5rem] border border-white/10 bg-white/5 shadow-2xl backdrop-blur-xl">
             <div className="border-b border-white/8 px-6 py-4">
               <div className="flex items-center justify-between">
                 <div>
@@ -508,19 +520,6 @@ export default function App() {
                   <CirclePlay className="h-4 w-4" />
                   Dispense selected spice
                 </button>
-              </div>
-
-              <div className="mt-4 rounded-[2rem] border border-white/10 bg-gradient-to-br from-cyan-400/10 to-fuchsia-400/10 p-4">
-                <div className="text-sm font-semibold text-white">Recipe steps</div>
-                <div className="mt-3 flex flex-wrap gap-2">
-                  {recipe ? (
-                    recipe.steps.map((step, idx) => (
-                      <QuickChip key={`${step.spice}-${idx}`} spice={step.spice} onClick={manualDispense} />
-                    ))
-                  ) : (
-                    <div className="text-sm text-slate-400">Recipe steps will appear here.</div>
-                  )}
-                </div>
               </div>
             </div>
           </aside>

@@ -5,6 +5,8 @@ import tailwindcss from "@tailwindcss/vite";
 export default defineConfig({
   plugins: [react(), tailwindcss()],
   server: {
+    host: "0.0.0.0",
+    allowedHosts: ["sixtieth-grapple-polygraph.ngrok-free.dev"],
     proxy: {
       "/api": {
         target: "http://localhost:5000",

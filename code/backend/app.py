@@ -20,7 +20,7 @@ load_dotenv()
 app = Flask(__name__)
 CORS(app)
 
-client = OpenAI()
+client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-5.4")
 ARDUINO_PORT = os.getenv("ARDUINO_PORT", "/dev/ttyACM0")
@@ -48,7 +48,7 @@ RECIPE_SCHEMA = {
                             "spice": {"type": "string", "enum": SPICES},
                             "description": {"type": "string"}
                         },
-                        "required": ["spice"],
+                        "required": ["spice", "description"],
                         "additionalProperties": False,
                     },
                 },
@@ -57,7 +57,7 @@ RECIPE_SCHEMA = {
                     "items": {"type": "string"},
                 },
             },
-            "required": ["title", "summary", "steps"],
+            "required": ["title", "summary", "servings", "steps", "notes"],
             "additionalProperties": False,
         },
     },
