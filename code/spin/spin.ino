@@ -109,6 +109,9 @@ void updateRing() {
 
 void updateGear() {
   if (!isDispensing) return;
+  Serial.println("Dispensing spice");
+  // uncomment this when two servos attached
+  //if (isMovingRing) return;
 
   if (millis() - lastGearMove < gearMoveInterval) return;
   lastGearMove = millis();
