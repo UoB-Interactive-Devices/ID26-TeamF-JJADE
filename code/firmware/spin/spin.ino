@@ -14,6 +14,9 @@ int gearPin = D8;
 String input = "none";
 String selectedSpice = "none";
 
+bool gearPushingOut = false;
+bool gearPullingBack = false;
+
 bool isMovingRing = false;
 bool isDispensing = false;
 bool dispenseStarted = false;
@@ -28,12 +31,12 @@ const int gearMoveInterval = 10;   // ms between gear steps
 int getSpicePosition(String spice) {
   spice.toLowerCase();
 
-  if (spice == "paprika") return 0;
-  if (spice == "cumin") return 30;
-  if (spice == "pepper") return 60;
-  if (spice == "salt") return 90;
-  if (spice == "oregano") return 120;
-  if (spice == "flakes") return 150;
+  if (spice == "paprika") return 10;
+  if (spice == "cumin") return 27;
+  if (spice == "pepper") return 50;
+  if (spice == "salt") return 75;
+  if (spice == "oregano") return 95;
+  if (spice == "flakes") return 270;
 
   return -1;
 }
@@ -51,6 +54,8 @@ void startSpiceSequence(String spice) {
   isMovingRing = true;
   isDispensing = false;
   dispenseStarted = false;
+  gearPushingOut = false;
+  gearPullingBack = false;
 
   Serial.print("OK ");
   Serial.println(spice);
@@ -100,10 +105,12 @@ void updateRing() {
     ringPos -= ringStepSize;
     if (ringPos < targetRingPos) ringPos = targetRingPos;
     ringServo.write(ringPos);
-  } else {
+    } else {
     isMovingRing = false;
     isDispensing = true;
     dispenseStarted = false;
+    gearPushingOut = true;
+    gearPullingBack = false;
   }
 }
 
@@ -113,30 +120,25 @@ void updateGear() {
   if (millis() - lastGearMove < gearMoveInterval) return;
   lastGearMove = millis();
 
-  // First, make sure the gear servo is at 0 before pushing
-  if (!dispenseStarted) {
+  if (gearPushingOut) {
+    if (gearPos < 180) {
+      gearPos += 1;
+      if (gearPos > 180) gearPos = 180;
+      gearServo.write(gearPos);
+    } else {
+      gearPushingOut = false;
+      gearPullingBack = true;
+    }
+    return;
+  }
+
+  if (gearPullingBack) {
     if (gearPos > 0) {
       gearPos -= 1;
       if (gearPos < 0) gearPos = 0;
       gearServo.write(gearPos);
     } else {
-      dispenseStarted = true;
-    }
-    return;
-  }
-
-  // Push out to dispense
-  if (gearPos < 180) {
-    gearPos += 1;
-    if (gearPos > 180) gearPos = 180;
-    gearServo.write(gearPos);
-  } else {
-    // Pull back after dispensing
-    gearPos -= 1;
-    if (gearPos < 0) gearPos = 0;
-    gearServo.write(gearPos);
-
-    if (gearPos == 0) {
+      gearPullingBack = false;
       isDispensing = false;
       Serial.println("DONE");
     }

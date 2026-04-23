@@ -27,7 +27,7 @@ ARDUINO_PORT = os.getenv("ARDUINO_PORT", "/dev/ttyACM0")
 ARDUINO_BAUD = int(os.getenv("ARDUINO_BAUD", "115200"))
 STEP_DELAY_SECONDS = float(os.getenv("STEP_DELAY_SECONDS", "1.0"))
 
-SPICES = ["paprika", "cumin", "pepper", "salt", "oregano", "flakes"]
+SPICES = ["none", "paprika", "cumin", "pepper", "salt", "oregano", "flakes"]
 
 RECIPE_SCHEMA = {
     "type": "object",
