@@ -6,9 +6,11 @@ import {
   Droplets,
   Flame,
   Leaf,
+  Mic,
   Send,
   Salad,
   Sparkles,
+  Volume2,
   Wand2,
   X,
 } from "lucide-react";
@@ -185,8 +187,15 @@ export default function App() {
   const [recipe, setRecipe] = useState(null);
   const [pendingAction, setPendingAction] = useState(null); // { kind: 'spice' | 'recipe', label: string }
   const [statusText, setStatusText] = useState("ready");
+  const [voiceMode, setVoiceMode] = useState(false);
+  const [listening, setListening] = useState(false);
+  const [speechSupported, setSpeechSupported] = useState(false);
+
   const actionTimerRef = useRef(null);
   const chatRef = useRef(null);
+  const recognitionRef = useRef(null);
+  const voiceModeRef = useRef(false);
+  const lastAssistantRef = useRef("");
 
   const selectedSpiceObj = useMemo(
     () => SPICES.find((s) => s.name === selectedSpice) ?? SPICES[0],
@@ -203,17 +212,53 @@ export default function App() {
   }, [messages, recipe]);
 
   useEffect(() => {
+    voiceModeRef.current = voiceMode;
+  }, [voiceMode]);
+
+  useEffect(() => {
+    setSpeechSupported(Boolean(window.SpeechRecognition || window.webkitSpeechRecognition));
+  }, []);
+
+  useEffect(() => {
     return () => {
       if (actionTimerRef.current) clearTimeout(actionTimerRef.current);
     };
   }, []);
 
-  async function handleSend(e) {
-    e.preventDefault();
-    const text = input.trim();
-    if (!text) return;
+  function speak(text) {
+    if (typeof window === "undefined" || !("speechSynthesis" in window) || !text) return;
+    window.speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.rate = 1;
+    utterance.pitch = 1;
+    utterance.lang = "en-US";
+    window.speechSynthesis.speak(utterance);
+  }
 
-    setMessages((prev) => [...prev, { role: "user", content: text }]);
+  function appendAssistant(text) {
+    lastAssistantRef.current = text;
+    setMessages((prev) => [...prev, { role: "assistant", content: text }]);
+    speak(text);
+  }
+
+  function speakRecipe(recipeObj) {
+    if (!recipeObj?.steps?.length) return;
+
+    const stepText = recipeObj.steps
+      .map((step, idx) => {
+        const desc = step.description || getStepDescription(idx, recipeObj.steps.length);
+        return `Step ${idx + 1}: ${step.spice}. ${desc}.`;
+      })
+      .join(" ");
+
+    speak(`${recipeObj.title}. ${recipeObj.summary}. ${stepText}`);
+  }
+
+  async function sendUserRequest(text) {
+    const clean = text.trim();
+    if (!clean) return;
+
+    setMessages((prev) => [...prev, { role: "user", content: clean }]);
     setInput("");
     setStatusText("thinking");
 
@@ -221,7 +266,7 @@ export default function App() {
       const res = await fetch("/api/recipe", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text, current_recipe: recipe }),
+        body: JSON.stringify({ text: clean, current_recipe: recipe }),
       });
 
       const data = await res.json();
@@ -229,16 +274,124 @@ export default function App() {
         throw new Error(data?.error || "Request failed");
       }
 
-      setMessages((prev) => [...prev, { role: "assistant", content: data.assistant_message }]);
+      appendAssistant(data.assistant_message);
       setRecipe(data.recipe || null);
       setStatusText("recipe ready");
+      if (voiceModeRef.current) speak("Recipe ready.");
     } catch (error) {
-      setMessages((prev) => [
-        ...prev,
-        { role: "assistant", content: "I could not generate a recipe right now." },
-      ]);
+      appendAssistant("I could not generate a recipe right now.");
       setStatusText("error");
     }
+  }
+
+  async function handleSend(e) {
+    e.preventDefault();
+    await sendUserRequest(input);
+  }
+
+  function handleVoiceText(transcript) {
+    const clean = transcript.trim();
+    const lower = clean.toLowerCase();
+
+    if (!clean) return;
+
+    if (/(cancel|stop listening)/.test(lower)) {
+      cancelPending();
+      speak("Canceled.");
+      return;
+    }
+
+    if (/repeat/.test(lower)) {
+      speak(lastAssistantRef.current || "Nothing to repeat.");
+      return;
+    }
+
+    if (recipe && /(read recipe|read the recipe)/.test(lower)) {
+      speakRecipe(recipe);
+      return;
+    }
+
+    if (recipe && /(dispense recipe|dispense all|all spices)/.test(lower)) {
+      dispenseRecipe(recipe);
+      return;
+    }
+
+    if (/(dispense selected|dispense spice)/.test(lower)) {
+      manualDispense(selectedSpiceObj.name);
+      return;
+    }
+
+    void sendUserRequest(clean);
+  }
+
+  function startVoiceMode() {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+    if (!SpeechRecognition) {
+      appendAssistant("Voice input is not available in this browser.");
+      setStatusText("voice unavailable");
+      return;
+    }
+
+    if (!recognitionRef.current) {
+      const recognition = new SpeechRecognition();
+      recognition.lang = "en-US";
+      recognition.interimResults = false;
+      recognition.continuous = false;
+
+      recognition.onresult = (event) => {
+        const transcript = event.results[event.results.length - 1][0].transcript;
+        handleVoiceText(transcript);
+      };
+
+      recognition.onerror = (event) => {
+        setListening(false);
+        setStatusText("error");
+        appendAssistant(`Voice input error: ${event.error}`);
+      };
+
+      recognition.onend = () => {
+        setListening(false);
+        if (voiceModeRef.current) {
+          setTimeout(() => {
+            try {
+              recognition.start();
+              setListening(true);
+            } catch {
+              // ignore
+            }
+          }, 400);
+        }
+      };
+
+      recognitionRef.current = recognition;
+    }
+
+    setVoiceMode(true);
+    setStatusText("listening");
+    speak("Voice mode on. Say what you want to make.");
+
+    try {
+      recognitionRef.current.start();
+      setListening(true);
+    } catch {
+      // ignore
+    }
+  }
+
+  function stopVoiceMode() {
+    setVoiceMode(false);
+    setListening(false);
+
+    if (recognitionRef.current) {
+      try {
+        recognitionRef.current.stop();
+      } catch {
+        // ignore
+      }
+    }
+
+    setStatusText("ready");
   }
 
   function clearPending() {
@@ -411,7 +564,40 @@ export default function App() {
               </div>
             </div>
 
-            <div ref={chatRef} className="flex-1 min-h-0 overflow-y-auto px-6 py-5">
+            <div className="flex flex-wrap items-center gap-2 border-b border-white/8 px-6 py-3">
+              <button
+                type="button"
+                onClick={voiceMode ? stopVoiceMode : startVoiceMode}
+                className="inline-flex items-center gap-2 rounded-full border border-cyan-300/18 bg-cyan-300/10 px-3 py-2 text-xs font-medium text-cyan-100 transition hover:bg-cyan-300/16"
+                aria-label={voiceMode ? "Stop voice mode" : "Start voice mode"}
+              >
+                <Mic className="h-4 w-4" />
+                {listening ? "Listening…" : voiceMode ? "Stop voice mode" : "Voice mode"}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => recipe && speakRecipe(recipe)}
+                disabled={!recipe}
+                className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-2 text-xs font-medium text-slate-200 transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-40"
+                aria-label="Read current recipe aloud"
+              >
+                <Volume2 className="h-4 w-4" />
+                Read recipe
+              </button>
+
+              <div className="text-xs text-slate-400">
+                Say “read recipe,” “dispense recipe,” “repeat,” or “cancel.”
+              </div>
+            </div>
+
+            <div
+              ref={chatRef}
+              role="log"
+              aria-live="polite"
+              aria-relevant="additions text"
+              className="flex-1 min-h-0 overflow-y-auto px-6 py-5"
+            >
               <div className="flex flex-col gap-4">
                 {messages.map((m, idx) => (
                   <AssistantBubble key={idx} role={m.role}>
