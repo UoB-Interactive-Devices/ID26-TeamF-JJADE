@@ -44,6 +44,9 @@ Key features include:
  ## Context annotation:
 ![Spice rack](context.png)
 
+## Commands to run code:
+1. Start backend: cd code/backend => python3 app.py
+2. Start frontend: cd code/frontend => npm run dev
 
 
 ## Form links
