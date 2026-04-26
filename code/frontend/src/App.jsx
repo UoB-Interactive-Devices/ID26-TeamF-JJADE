@@ -16,7 +16,6 @@ import {
 } from "lucide-react";
 
 const SPICES = [
-  { name: "paprika", icon: Flame },
   { name: "cumin", icon: Sparkles },
   { name: "pepper", icon: Wand2 },
   { name: "salt", icon: Droplets },
@@ -125,7 +124,8 @@ function RecipeCard({ recipe, selectedSpice, onDispenseAll, onReplaceStep, onRem
         {recipe.steps.map((step, idx) => (
           <div
             key={`${step.spice}-${idx}`}
-            className="flex items-center justify-between gap-3 rounded-[1.25rem] border border-white/10 bg-white/5 px-4 py-3"
+            className=
+              "flex items-center justify-between gap-3 rounded-[1.25rem] border border-white/10 bg-white/5 px-4 py-3"
           >
             <div>
               <div className="text-sm font-medium text-white">
@@ -189,13 +189,17 @@ export default function App() {
   const [statusText, setStatusText] = useState("ready");
   const [voiceMode, setVoiceMode] = useState(false);
   const [listening, setListening] = useState(false);
-  const [speechSupported, setSpeechSupported] = useState(false);
+  const [isReadingRecipe, setIsReadingRecipe] = useState(false);
+  const [isPaused, setIsPaused] = useState(false);
+  const [readingIndex, setReadingIndex] = useState(0);
 
   const actionTimerRef = useRef(null);
   const chatRef = useRef(null);
   const recognitionRef = useRef(null);
   const voiceModeRef = useRef(false);
   const lastAssistantRef = useRef("");
+  const isPausedRef = useRef(false);
+  const isSpeakingRef = useRef(false);
 
   const selectedSpiceObj = useMemo(
     () => SPICES.find((s) => s.name === selectedSpice) ?? SPICES[0],
@@ -216,22 +220,46 @@ export default function App() {
   }, [voiceMode]);
 
   useEffect(() => {
-    setSpeechSupported(Boolean(window.SpeechRecognition || window.webkitSpeechRecognition));
-  }, []);
-
-  useEffect(() => {
     return () => {
       if (actionTimerRef.current) clearTimeout(actionTimerRef.current);
     };
   }, []);
 
-  function speak(text) {
-    if (typeof window === "undefined" || !("speechSynthesis" in window) || !text) return;
+  useEffect(() => {
+    isPausedRef.current = isPaused;
+  }, [isPaused]);
+
+  function speak(text, onEnd) {
+    if (!("speechSynthesis" in window) || !text) return;
+
+    // stop listening while speaking
+    if (recognitionRef.current && listening) {
+      try {
+        recognitionRef.current.stop();
+      } catch {}
+      setListening(false);
+    }
+
     window.speechSynthesis.cancel();
+
     const utterance = new SpeechSynthesisUtterance(text);
-    utterance.rate = 1;
-    utterance.pitch = 1;
-    utterance.lang = "en-US";
+
+    isSpeakingRef.current = true;
+
+    utterance.onend = () => {
+      isSpeakingRef.current = false;
+
+      // resume listening
+      if (voiceModeRef.current && recognitionRef.current) {
+        try {
+          recognitionRef.current.start();
+          setListening(true);
+        } catch {}
+      }
+
+      if (onEnd) onEnd();
+    };
+
     window.speechSynthesis.speak(utterance);
   }
 
@@ -241,17 +269,59 @@ export default function App() {
     speak(text);
   }
 
-  function speakRecipe(recipeObj) {
+  function readStep(index) {
+    if (!recipe || !recipe.steps[index]) return;
+
+    const step = recipe.steps[index];
+
+    const utterance = new SpeechSynthesisUtterance(
+      `Step ${index + 1}: ${step.spice}. ${step.description}`
+    );
+
+    utterance.onend = () => {
+      if (!isPausedRef.current) {
+        setReadingIndex((prev) => {
+          const next = prev + 1;
+
+          if (recipe && next < recipe.steps.length) {
+            readStep(next);
+          } else {
+            setIsReadingRecipe(false);
+          }
+
+          return next;
+        });
+      }
+    };
+
+    // 🔥 DO NOT cancel here
+    window.speechSynthesis.speak(utterance);
+  }
+
+  function startReadingRecipe(recipeObj) {
     if (!recipeObj?.steps?.length) return;
 
-    const stepText = recipeObj.steps
-      .map((step, idx) => {
-        const desc = step.description || getStepDescription(idx, recipeObj.steps.length);
-        return `Step ${idx + 1}: ${step.spice}. ${desc}.`;
-      })
-      .join(" ");
+    window.speechSynthesis.cancel(); // only place cancel is allowed
 
-    speak(`${recipeObj.title}. ${recipeObj.summary}. ${stepText}`);
+    setIsReadingRecipe(true);
+    setIsPaused(false);
+    isPausedRef.current = false;
+
+    setReadingIndex(0);
+
+    readStep(0);
+  }
+
+  function pauseReading() {
+    window.speechSynthesis.pause();
+    setIsPaused(true);
+    isPausedRef.current = true;
+  }
+
+  function resumeReading() {
+    window.speechSynthesis.resume();
+    setIsPaused(false);
+    isPausedRef.current = false;
   }
 
   async function sendUserRequest(text) {
@@ -295,32 +365,55 @@ export default function App() {
 
     if (!clean) return;
 
-    if (/(cancel|stop listening)/.test(lower)) {
+    // 🚨 CANCEL
+    if (/(cancel|stop)/.test(lower)) {
       cancelPending();
       speak("Canceled.");
       return;
     }
 
+    // 🔁 REPEAT
     if (/repeat/.test(lower)) {
       speak(lastAssistantRef.current || "Nothing to repeat.");
       return;
     }
 
-    if (recipe && /(read recipe|read the recipe)/.test(lower)) {
-      speakRecipe(recipe);
+    // 📖 READ RECIPE
+    if (/pause/.test(lower)) {
+      pauseReading();
+      speak("Paused.");
       return;
     }
 
-    if (recipe && /(dispense recipe|dispense all|all spices)/.test(lower)) {
+    if (/resume/.test(lower)) {
+      resumeReading();
+      speak("Resuming.");
+      return;
+    }
+
+    if (recipe && /(read recipe|start reading)/.test(lower)) {
+      startReadingRecipe(recipe);
+      return;
+    }
+
+    // 🍳 DISPENSE FULL RECIPE
+    if (recipe && /(dispense recipe|make it|start cooking|do the recipe)/.test(lower)) {
       dispenseRecipe(recipe);
       return;
     }
 
-    if (/(dispense selected|dispense spice)/.test(lower)) {
-      manualDispense(selectedSpiceObj.name);
-      return;
+    // 🧂 SPICE MATCH (🔥 NEW LOGIC)
+    const matchedSpice = SPICES.find((s) => lower.includes(s.name));
+
+    if (matchedSpice) {
+      // detect intent phrases
+      if (/(dispense|give me|add|use|put)/.test(lower)) {
+        manualDispense(matchedSpice.name);
+        return;
+      }
     }
 
+    // 🎤 FALLBACK → AI
     void sendUserRequest(clean);
   }
 
@@ -575,16 +668,32 @@ export default function App() {
                 {listening ? "Listening…" : voiceMode ? "Stop voice mode" : "Voice mode"}
               </button>
 
-              <button
-                type="button"
-                onClick={() => recipe && speakRecipe(recipe)}
-                disabled={!recipe}
-                className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-2 text-xs font-medium text-slate-200 transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-40"
-                aria-label="Read current recipe aloud"
-              >
-                <Volume2 className="h-4 w-4" />
-                Read recipe
-              </button>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => startReadingRecipe(recipe)}
+                  disabled={!recipe}
+                  className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-2 text-xs text-slate-200"
+                >
+                  <Volume2 className="h-4 w-4" />
+                  Start Reading
+                </button>
+
+                <button
+                  onClick={pauseReading}
+                  disabled={!isReadingRecipe}
+                  className="rounded-full border border-white/10 bg-white/5 px-3 py-2 text-xs text-slate-200"
+                >
+                  ⏸️
+                </button>
+
+                <button
+                  onClick={resumeReading}
+                  disabled={!isPaused}
+                  className="rounded-full border border-white/10 bg-white/5 px-3 py-2 text-xs text-slate-200"
+                >
+                  ▶️
+                </button>
+              </div>
 
               <div className="text-xs text-slate-400">
                 Say “read recipe,” “dispense recipe,” “repeat,” or “cancel.”

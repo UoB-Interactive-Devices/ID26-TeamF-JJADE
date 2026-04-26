@@ -31,7 +31,6 @@ const int gearMoveInterval = 10;   // ms between gear steps
 int getSpicePosition(String spice) {
   spice.toLowerCase();
 
-  if (spice == "paprika") return 10;
   if (spice == "cumin") return 27;
   if (spice == "pepper") return 50;
   if (spice == "salt") return 75;

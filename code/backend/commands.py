@@ -16,10 +16,9 @@ with open(os.path.expanduser("~/.openai/IDkey.txt")) as f:
 
 client = OpenAI()
 
-SPICES = ["none", "paprika", "cumin", "pepper", "salt", "oregano", "flakes"]
+SPICES = ["none", "cumin", "pepper", "salt", "oregano", "flakes"]
 
 SPICE_MAP = {
-    "paprika": 0,
     "cumin": 30,
     "pepper": 60,
     "salt": 90,
@@ -45,7 +44,7 @@ def interpret_with_ai(user_text):
                     "You control a spice carousel.\n"
                     "Select ONE spice based on the user's request.\n"
                     "If the user request is unrelated to spices, return nothing."
-                    "Allowed spices: NONE, paprika, cumin, pepper, salt, oregano, flakes.\n"
+                    "Allowed spices: NONE, cumin, pepper, salt, oregano, flakes.\n"
                     "Return ONLY valid JSON.\n"
                 )
             },

@@ -27,7 +27,7 @@ ARDUINO_PORT = os.getenv("ARDUINO_PORT", "/dev/ttyACM0")
 ARDUINO_BAUD = int(os.getenv("ARDUINO_BAUD", "115200"))
 STEP_DELAY_SECONDS = float(os.getenv("STEP_DELAY_SECONDS", "1.0"))
 
-SPICES = ["none", "paprika", "cumin", "pepper", "salt", "oregano", "flakes"]
+SPICES = ["none", "cumin", "pepper", "salt", "oregano", "flakes"]
 
 RECIPE_SCHEMA = {
     "type": "object",
@@ -83,7 +83,6 @@ active_job: Dict[str, Any] = {
 def enrich_steps(recipe):
     default_descriptions = {
         "cumin": "Builds a warm, earthy base",
-        "paprika": "Adds smoky depth and color",
         "salt": "Balances and enhances flavors",
         "pepper": "Adds gentle heat and complexity",
         "oregano": "Brings a fresh, herby note",
@@ -221,20 +220,18 @@ def fallback_recipe(user_text: str, previous_recipe: Optional[Dict[str, Any]]) -
 
     if "taco" in lower:
         return {
-            "assistant_message": "Let’s build a smoky, street-style taco seasoning with a warm cumin base and paprika for depth.",
+            "assistant_message": "Let’s build a smoky, street-style taco seasoning with a warm cumin base for depth.",
             "recipe": {
                 "title": "Taco seasoning plan",
                 "summary": "Smoky, savory, and easy to adjust.",
                 "servings": 4,
                 "steps": [
                     {"spice": "cumin", "description": "Builds a warm, earthy base"},
-                    {"spice": "paprika", "description": "Adds smoky depth and color"},
                     {"spice": "salt", "description": "Balances and enhances the flavors"},
                 ],
                 "notes": [
                     "Great with ground beef or grilled vegetables",
                     "Add lime juice after cooking for brightness",
-                    "Adjust paprika for more or less heat",
                 ],
             },
         }
@@ -313,7 +310,7 @@ def generate_recipe(user_text: str, previous_recipe: Optional[Dict[str, Any]]) -
     - The message should feel like an invitation to cook, not a status update
 
     Recipe rules:
-    - Use only these spices: paprika, cumin, pepper, salt, oregano, flakes
+    - Use only these spices: cumin, pepper, salt, oregano, flakes
     - Keep steps to 3–5
     - Each step must include:
     - spice
