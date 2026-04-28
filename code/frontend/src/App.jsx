@@ -192,6 +192,8 @@ export default function App() {
   const [isReadingRecipe, setIsReadingRecipe] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
   const [readingIndex, setReadingIndex] = useState(0);
+  const [activated, setActivated] = useState(false);
+  const activationTimeoutRef = useRef(null);
 
   const actionTimerRef = useRef(null);
   const chatRef = useRef(null);
@@ -240,8 +242,6 @@ export default function App() {
       setListening(false);
     }
 
-    window.speechSynthesis.cancel();
-
     const utterance = new SpeechSynthesisUtterance(text);
 
     isSpeakingRef.current = true;
@@ -263,6 +263,14 @@ export default function App() {
     window.speechSynthesis.speak(utterance);
   }
 
+  function resetActivation() {
+    setActivated(false);
+
+    if (activationTimeoutRef.current) {
+      clearTimeout(activationTimeoutRef.current);
+    }
+  }
+
   function appendAssistant(text) {
     lastAssistantRef.current = text;
     setMessages((prev) => [...prev, { role: "assistant", content: text }]);
@@ -274,11 +282,9 @@ export default function App() {
 
     const step = recipe.steps[index];
 
-    const utterance = new SpeechSynthesisUtterance(
-      `Step ${index + 1}: ${step.spice}. ${step.description}`
-    );
+    const text = `Step ${index + 1}: ${step.spice}. ${step.description}`;
 
-    utterance.onend = () => {
+    speak(text, () => {
       if (!isPausedRef.current) {
         setReadingIndex((prev) => {
           const next = prev + 1;
@@ -292,16 +298,13 @@ export default function App() {
           return next;
         });
       }
-    };
-
-    // 🔥 DO NOT cancel here
-    window.speechSynthesis.speak(utterance);
+    });
   }
 
   function startReadingRecipe(recipeObj) {
     if (!recipeObj?.steps?.length) return;
 
-    window.speechSynthesis.cancel(); // only place cancel is allowed
+    // window.speechSynthesis.cancel(); // only place cancel is allowed
 
     setIsReadingRecipe(true);
     setIsPaused(false);
@@ -365,6 +368,40 @@ export default function App() {
 
     if (!clean) return;
 
+    // 🔇 ignore if we're speaking (prevents feedback loop)
+    // if (window.speechSynthesis.speaking) return;
+
+    // 🟢 STEP 1: WAKE WORD
+    if (!activated) {
+      const match = lower.match(/\b(shroom|showroom|hash room|stream)\b(.*)/);
+
+      if (match) {
+        const command = match[2].trim(); // everything AFTER "shroom"
+
+        // 🟢 CASE 1: command exists
+        if (command.length > 0) {
+          processCommand(command);
+          return;
+        }
+
+        // 🟢 CASE 2: just wake word → activate
+        setActivated(true);
+        speak("Yes?");
+
+        activationTimeoutRef.current = setTimeout(() => {
+          resetActivation();
+        }, 5000);
+      }
+
+      return;
+    }
+
+    // 🟡 STEP 2: COMMAND MODE
+    resetActivation();
+    processCommand(lower);
+  }
+
+  function processCommand(lower) {
     // 🚨 CANCEL
     if (/(cancel|stop)/.test(lower)) {
       cancelPending();
@@ -378,7 +415,7 @@ export default function App() {
       return;
     }
 
-    // 📖 READ RECIPE
+    // 📖 RECIPE CONTROLS
     if (/pause/.test(lower)) {
       pauseReading();
       speak("Paused.");
@@ -396,25 +433,24 @@ export default function App() {
       return;
     }
 
-    // 🍳 DISPENSE FULL RECIPE
-    if (recipe && /(dispense recipe|make it|start cooking|do the recipe)/.test(lower)) {
+    // 🍳 DISPENSE RECIPE
+    if (recipe && /(dispense recipe|make it|start cooking)/.test(lower)) {
       dispenseRecipe(recipe);
       return;
     }
 
-    // 🧂 SPICE MATCH (🔥 NEW LOGIC)
-    const matchedSpice = SPICES.find((s) => lower.includes(s.name));
+    // 🧂 SPICE COMMAND
+    const matchedSpice = SPICES.find((s) =>
+      new RegExp(`\\b${s.name}\\b`).test(lower)
+    );
 
-    if (matchedSpice) {
-      // detect intent phrases
-      if (/(dispense|give me|add|use|put)/.test(lower)) {
-        manualDispense(matchedSpice.name);
-        return;
-      }
+    if (matchedSpice && /(dispense|give me|add|use|put)/.test(lower)) {
+      manualDispense(matchedSpice.name);
+      return;
     }
 
-    // 🎤 FALLBACK → AI
-    void sendUserRequest(clean);
+    // 🎤 fallback
+    void sendUserRequest(lower);
   }
 
   function startVoiceMode() {
@@ -432,12 +468,22 @@ export default function App() {
       recognition.interimResults = false;
       recognition.continuous = false;
 
+      recognition.onstart = () => {
+        console.log("🎤 Listening started");
+      };
+
       recognition.onresult = (event) => {
         const transcript = event.results[event.results.length - 1][0].transcript;
+        console.log("🗣️ Heard:", transcript);
         handleVoiceText(transcript);
       };
 
       recognition.onerror = (event) => {
+        console.log("Voice error:", event.error);
+
+        if (event.error === "no-speech") {
+          return;
+        }
         setListening(false);
         setStatusText("error");
         appendAssistant(`Voice input error: ${event.error}`);
@@ -455,6 +501,7 @@ export default function App() {
             }
           }, 400);
         }
+        console.log("🔁 Restarting recognition...");
       };
 
       recognitionRef.current = recognition;
@@ -670,7 +717,10 @@ export default function App() {
 
               <div className="flex gap-2">
                 <button
-                  onClick={() => startReadingRecipe(recipe)}
+                  onClick={() => {
+                    console.log("CLICKED", recipe);
+                    startReadingRecipe(recipe);
+                  }}
                   disabled={!recipe}
                   className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-2 text-xs text-slate-200"
                 >
@@ -790,7 +840,7 @@ export default function App() {
               </div>
             </div>
 
-            <div className="flex-1 px-5 py-5">
+            <div className="flex-1 min-h-0 overflow-y-auto px-5 py-5">
               <div className="grid grid-cols-2 gap-3">
                 {SPICES.map((spice) => (
                   <SpiceCard
